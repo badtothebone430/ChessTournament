@@ -48,7 +48,8 @@ latest_update = min(times)
 print("Newest update (minutes ago):", latest_update)
 
 # Notify if update happened within 2 minutes
-if latest_update <= 2:
+#if latest_update <= 2:
+if True:
     requests.post(WEBHOOK, json={
         "content": f"♟ Barbados chess results updated {latest_update} minute(s) ago!"
     })
