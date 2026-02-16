@@ -1,8 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime, timezone
-import os
 import re
+import os
 
 URL = "https://chess-results.com/fed.aspx?lan=1&fed=BAR"
 WEBHOOK = os.getenv("DISCORD_WEBHOOK")
@@ -10,25 +9,46 @@ WEBHOOK = os.getenv("DISCORD_WEBHOOK")
 res = requests.get(URL)
 soup = BeautifulSoup(res.text, "html.parser")
 
-text = soup.get_text()
+times = []
 
-match = re.search(r"Last update\s*:\s*(.*)", text)
+# Find all cells containing update times
+cells = soup.find_all("td", class_="CRnowrap")
 
-if not match:
-    print("No update field found")
+for cell in cells:
+    text = cell.get_text(" ", strip=True)
+
+    # Example matches:
+    # 3 Hours 13 Min.
+    # 2 Days 7 Hours
+    # 19 Hours 26 Min.
+    # 36 Days 10 Hours
+    
+    days = re.search(r"(\d+)\s*Days?", text)
+    hours = re.search(r"(\d+)\s*Hours?", text)
+    mins = re.search(r"(\d+)\s*Min", text)
+
+    total_minutes = 0
+
+    if days:
+        total_minutes += int(days.group(1)) * 1440
+    if hours:
+        total_minutes += int(hours.group(1)) * 60
+    if mins:
+        total_minutes += int(mins.group(1))
+
+    if total_minutes > 0:
+        times.append(total_minutes)
+
+if not times:
+    print("No time values found")
     exit()
 
-update_str = match.group(1).strip()
+latest_update = min(times)
 
-update_time = datetime.strptime(update_str, "%d.%m.%Y %H:%M")
-update_time = update_time.replace(tzinfo=timezone.utc)
+print("Newest update (minutes ago):", latest_update)
 
-now = datetime.now(timezone.utc)
-
-diff = (now - update_time).total_seconds()
-
-# Notify if updated within last 2 minutes
-if 0 <= diff <= 120:
+# Notify if update happened within 2 minutes
+if latest_update <= 2:
     requests.post(WEBHOOK, json={
-        "content": f"♟ Chess Results BAR updated at {update_str}"
+        "content": f"♟ Barbados chess results updated {latest_update} minute(s) ago!"
     })
